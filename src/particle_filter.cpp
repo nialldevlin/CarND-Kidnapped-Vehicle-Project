@@ -31,8 +31,21 @@ void ParticleFilter::init(double x, double y, double theta, double std[]) {
    *   (and others in this file).
    */
   num_particles = 1000;  // TODO: Set the number of particles
-  for(int i = 0; i < num_particles; i++){
-    particles.push_back(
+  
+  normal_distribution<double> dist_x(gps_x, std_x);
+  
+  // TODO: Create normal distributions for y and theta
+  normal_distribution<double> dist_y(gps_y, std_y);
+  normal_distribution<double> dist_theta(theta, std_theta);
+
+  for (int i = 0; i < num_particles; ++i) {
+    Particle particle;
+    
+    particle.x = dist_x(this->gen);
+    particle.y = dist_y(this->gen);
+    particle.theta = dist_theta(this->gen);
+    particle.weight = 1;
+    this->particles.push_back(particle);
   }
 
 }
@@ -46,6 +59,21 @@ void ParticleFilter::prediction(double delta_t, double std_pos[],
    *  http://en.cppreference.com/w/cpp/numeric/random/normal_distribution
    *  http://www.cplusplus.com/reference/random/default_random_engine/
    */
+  
+  
+  for(Particle &particle : this->particles){    
+    particle.x += (velocity / yaw_rate) * sin(particle.theta + yaw_rate * delta_t) - sin(particle.theta);
+    particle.y += (velocity / yaw_rate) * cos(particle.theta) - cos(particle.theta + yaw_rate * delta_t);
+    particle.theta += yaw_rate;
+    
+    normal_distribution<double> dist_x(0, std_pos[0]);
+    normal_distribution<double> dist_y(0, std_pos[1]);
+    normal_distribution<double> dist_theta(0, std_pos[2]);
+    
+    particle.x += dist_x(this->gen);
+    particle.y += dist_y(this->gen);
+    particle.theta += dist_theta(this->gen);
+  }
 
 }
 
@@ -59,6 +87,18 @@ void ParticleFilter::dataAssociation(vector<LandmarkObs> predicted,
    *   probably find it useful to implement this method and use it as a helper 
    *   during the updateWeights phase.
    */
+  
+  for(LandmarkObs &p : predicted){
+    double dist = 0;
+  	double prev_dist = std::numeric_limits<double>::infinity();;
+    for(const LandmarkObs &obs : observations){
+      dist = dist(p.x, p.x, obs.x, obs.y);
+      if(dist < prev_dist){
+        prev_dist = dist;
+        p.id = obs.id;
+      }
+    }
+  }
 
 }
 
@@ -78,7 +118,46 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
    *   and the following is a good resource for the actual equation to implement
    *   (look at equation 3.33) http://planning.cs.uiuc.edu/node99.html
    */
+  for(Particle &p : this->particles){
+    //Convert each observation coordinates to map
+    vector<LandmarkObs> mapObs;
+    LandmarkObs obs;
+    for(const LandmarkObs &o : observations){
+      // transform to map x coordinate
+      double x_map;
+      obs.x = p.x + (cos(p.theta) * o.x) - (sin(p.theta) * o.y);
 
+      // transform to map y coordinate
+      double y_map;
+      obs.y = y_part + (sin(theta) * o.x) + (cos(p.theta) * o.y);
+      mapObs.push_back(obs);
+    }
+    vector<LandmarkObs> lm_in_range;
+    //Find landmarks in sensor range
+    for(const LandmarkObs &l : map_landmarks){
+      if(dist(l.x, l.y, p.x, p.y) <= sensor_range){
+        lm_in_range.push_back(l);
+      }
+    }
+    //Map observations to landmarks
+    dataAssociation(lm_in_range, observations);
+    //Calculate weights with gaussian
+    // calculate normalization term
+    p.weight = 1.;
+    for(const LandmarkObs &lm : lm_in_range){
+      double gauss_norm;
+      gauss_norm = 1 / (2 * M_PI * std_landmark[0] * std_landmark[1]);
+
+      // calculate exponent
+      double exponent;
+      exponent = (pow(observations[lm.id].x - lm.x, 2) / (2 * pow(std_landmark[0], 2)))
+                   + (pow(observations[lm.id].y - lm.y, 2) / (2 * pow(std_landmark[1], 2)));
+
+      // calculate weight using normalization terms and exponent
+      p.weight *= gauss_norm * exp(-exponent);
+    }
+    
+  }
 }
 
 void ParticleFilter::resample() {
@@ -88,7 +167,17 @@ void ParticleFilter::resample() {
    * NOTE: You may find std::discrete_distribution helpful here.
    *   http://en.cppreference.com/w/cpp/numeric/random/discrete_distribution
    */
-
+  vector<Particle> new_particles(this->particles.size());
+  index = gen % 
+    beta = 0.0
+    mw = max(w)
+    for i in range(N):
+        beta += random.random() * 2.0 * mw
+        while beta > w[index]:
+            beta -= w[index]
+            index = (index + 1) % N
+        p3.append(p[index])
+    p = p3
 }
 
 void ParticleFilter::SetAssociations(Particle& particle, 
