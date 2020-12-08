@@ -9,6 +9,7 @@
 #define MAP_H_
 
 #include <vector>
+#include "helper_functions.h"
 
 class Map {
  public:  
