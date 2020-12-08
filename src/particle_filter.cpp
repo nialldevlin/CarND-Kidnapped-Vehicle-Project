@@ -67,8 +67,8 @@ void ParticleFilter::prediction(double delta_t, double std_pos[],
   
   
   for(Particle &particle : this->particles){    
-    particle.x += (velocity / yaw_rate) * sin(particle.theta + yaw_rate * delta_t) - sin(particle.theta);
-    particle.y += (velocity / yaw_rate) * cos(particle.theta) - cos(particle.theta + yaw_rate * delta_t);
+    particle.x += (velocity / yaw_rate) * (sin(particle.theta + yaw_rate * delta_t) - sin(particle.theta));
+    particle.y += (velocity / yaw_rate) * (cos(particle.theta) - cos(particle.theta + yaw_rate * delta_t));
     particle.theta += yaw_rate;
     
     std::normal_distribution<double> dist_x(particle.x, std_pos[0]);
@@ -177,7 +177,7 @@ void ParticleFilter::resample() {
    */
   vector<Particle> new_particles(this->num_particles);
   std::discrete_distribution<int> dist(weights.begin(), weights.end());
-  for(Particle p : new_particles){
+  for(Particle &p : new_particles){
     int id = dist(this->gen);
     p = particles[id];
   }
