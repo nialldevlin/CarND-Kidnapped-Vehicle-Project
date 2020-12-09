@@ -132,17 +132,20 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
     //Calculate weights with gaussian
     p.weight = 1.;
     this->weights[p.id] = 1.;
-    std::cout << std::endl << "landmarks in range size: " << lm_in_range.size() << std::endl << std::flush;
+    std::cout << std::endl << "landmarks in range: " << lm_in_range.size() << std::endl << std::flush;
     for(const LandmarkObs &m : mapObs){   
       // calculate weight
-      //std::cout << m.x << " : " << lm_in_range[m.id].x << " , " << m.y << " : " << lm_in_range[m.id].y << std::endl << std::flush;
+      std::cout << "Obs x: "m.x 
+        		<< ", Landmark x: "  << lm_in_range[m.id].x
+                << " , Obs Y: " << m.y 
+        		<< ", Landmark Y:  " << lm_in_range[m.id].y << std::endl << std::flush;
       double weight = multiv_prob(std_landmark[0], std_landmark[1], m.x, m.y, lm_in_range[m.id].x, lm_in_range[m.id].y);
       if( weight > 0 ){
       	p.weight *= weight;
       }
     }
     this->weights[p.id] = p.weight;
-    //std::cout << p.weight << " " << std::flush;
+    std::cout << "Weight: " << p.weight << " " << std::flush;
   }
 }
 

@@ -71,6 +71,7 @@ inline double multiv_prob(double sig_x, double sig_y, double x_obs, double y_obs
   // calculate weight using normalization terms and exponent
   double weight;
   weight = gauss_norm * exp(-exponent);  
+  std::cout << std::endl << "Exponent: " << exponent << std::endl << std::flush;
   return weight;
 }
 
