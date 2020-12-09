@@ -5,5 +5,7 @@
 #
 
 # Run particle filter
+./clean.sh
+./build.sh
 cd ./build
 ./particle_filter

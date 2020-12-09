@@ -33,8 +33,11 @@ void ParticleFilter::init(double x, double y, double theta, double std[]) {
   // TODO: Create normal distributions for y and theta
   std::normal_distribution<double> dist_y(y, std[1]);
   std::normal_distribution<double> dist_theta(theta, std[2]);
+  
+  this->particles.reserve(num_particles);
+  this->weights.reserve(num_particles);
 
-  for (int i = 0; i < this->num_particles; ++i) {
+  for (int i = 0; i < this->num_particles; i++) {
     Particle particle;
     
     particle.id = i;
@@ -45,7 +48,7 @@ void ParticleFilter::init(double x, double y, double theta, double std[]) {
     this->weights.push_back(particle.weight);
     this->particles.push_back(particle);
   }
-  is_initialized = true;
+  this->is_initialized = true;
 
 }
 
@@ -96,7 +99,7 @@ void ParticleFilter::dataAssociation(std::vector<LandmarkObs> &predicted,
   	double prev_dist = std::numeric_limits<double>::infinity();;
     p.id = -1;
     for(unsigned int i = 0; i < observations.size(); i++){
-      distance = dist(p.x, p.x, observations[i].x, observations[i].y);
+      distance = dist(p.x, p.y, observations[i].x, observations[i].y);
       if(distance < prev_dist){
         prev_dist = distance;
         p.id = i;
@@ -156,7 +159,7 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
       // calculate exponent
       double exponent;
       exponent = (pow(mapObs[lm.id].x - lm.x, 2) / (2 * pow(std_landmark[0], 2)))
-                   + (pow(mapObs[lm.id].y - lm.y, 2) / (2 * pow(std_landmark[1], 2)));
+               + (pow(mapObs[lm.id].y - lm.y, 2) / (2 * pow(std_landmark[1], 2)));
 
       // calculate weight using normalization terms and exponent
       p.weight *= gauss_norm * exp(-exponent);
