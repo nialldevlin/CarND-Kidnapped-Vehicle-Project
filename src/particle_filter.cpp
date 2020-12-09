@@ -20,7 +20,7 @@
 
 void ParticleFilter::init(double x, double y, double theta, double std[]) {
   std::cout << "Initialized" << std::endl << std::flush;
-  this->num_particles = 20;	//Set number of particles
+  this->num_particles = 10;	//Set number of particles
   
   std::normal_distribution<double> dist_x(x, std[0]);	//X distribution
   std::normal_distribution<double> dist_y(y, std[1]);	//Y distribution
@@ -54,14 +54,15 @@ void ParticleFilter::prediction(double delta_t, double std_pos[],
   for(Particle &particle : this->particles){
     double theta = particle.theta;
     
-    if(fabs(yaw_rate) >= 0.00001){	//If yaw_rate not zero use equations
-      particle.x += (velocity / yaw_rate) * (sin(theta + yaw_rate * delta_t) - sin(theta));
-      particle.y += (velocity / yaw_rate) * (cos(theta) - cos(theta + yaw_rate * delta_t));
-      particle.theta += yaw_rate * delta_t;      
-    } else {	//If yaw rate is zero use equations
+    if(fabs(yaw_rate) == 0){	//If yaw_rate zero use equations
       particle.x += velocity * delta_t * cos(theta);
       particle.y += velocity * delta_t * sin(theta);
       particle.theta = theta;
+           
+    } else {	//If yaw rate is not zero use equations
+      particle.x += (velocity / yaw_rate) * (sin(theta + yaw_rate * delta_t) - sin(theta));
+      particle.y += (velocity / yaw_rate) * (cos(theta) - cos(theta + yaw_rate * delta_t));
+      particle.theta += yaw_rate * delta_t; 
     }
     particle.x += dist_x(this->gen);	//Add x noise
     particle.y += dist_y(this->gen);	//Add y noise
@@ -74,25 +75,25 @@ void ParticleFilter::dataAssociation(std::vector<LandmarkObs> predicted,
                                      std::vector<LandmarkObs> &observations, 
                                      Particle &particle) {
   std::vector<int> ass;
-  std::vector<double> sense_x;
-  std::vector<double> sense_y;
+  std::vector<double> s_x;
+  std::vector<double> s_y;
   
   for(unsigned int i = 0; i < observations.size(); i++){
-    double distance = 0;
+    double curr_dist = 0;
   	double prev_dist = std::numeric_limits<double>::infinity();
     observations[i].id = -1;
     for(LandmarkObs &p : predicted){
-      distance = dist(p.x, p.y, observations[i].x, observations[i].y);
-      if(distance < prev_dist){	//Loop until smallest distance, this is the closest
-        prev_dist = distance;
+      curr_dist = dist(p.x, p.y, observations[i].x, observations[i].y);
+      if(curr_dist < prev_dist){	//Loop until smallest distance, this is the closest
+        prev_dist = curr_dist;
         observations[i].id = i;	//Set ID to location in observations vector of corrosponding observation
       }
     }
     ass.push_back(observations[i].id);
-    sense_x.push_back(observations[i].x);
-    sense_y.push_back(observations[i].y);
+    s_x.push_back(observations[i].x);
+    s_y.push_back(observations[i].y);
   }
-  //SetAssociations(particle, ass, sense_x, sense_y);
+  //SetAssociations(particle, ass, s_x, s_y);
 }
 
 void ParticleFilter::updateWeights(double sensor_range, double std_landmark[], 
@@ -128,35 +129,20 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
     //Map observations to landmarks
     dataAssociation(lm_in_range, mapObs, p);
     
-    /*std::cout << std:: endl << "Map OBS " << std::flush;
-    for (int i = 0; i < mapObs.size(); i++){
-      std::cout << i << " X: " << mapObs[i].x << " Y: " << mapObs[i].y << ' ' << std::flush;
-    }
-    
-    std::cout << std:: endl << "Landmarks in range " << std::flush;
-    for (auto &i : lm_in_range)
-      std::cout << " ID: " << i.id << " X: " << i.x << " Y: " << i.y << ' ' << std::flush;*/
-    
     //Calculate weights with gaussian
     p.weight = 1.;
     this->weights[p.id] = 1.;
-    std::cout << "Map OBS size: " << mapObs.size() << std::endl << std::flush;
-    for(const LandmarkObs &m : mapObs){
-      // calculate normalization term
-      double gauss_norm;
-      gauss_norm = 1 / (2 * M_PI * std_landmark[0] * std_landmark[1]);
-
-      // calculate exponent
-      double exponent;
-      exponent = (pow(m.x - lm_in_range[m.id].x, 2) / (2 * pow(std_landmark[0], 2)))
-               + (pow(m.y - lm_in_range[m.id].y, 2) / (2 * pow(std_landmark[1], 2)));
-
-      // calculate weight using normalization terms and exponent
-      p.weight *= gauss_norm * exp(-exponent);
-      this->weights[p.id] = p.weight;
-      std::cout << p.weight << " " << std::flush;
+    std::cout << std::endl << "landmarks in range size: " << lm_in_range.size() << std::endl << std::flush;
+    for(const LandmarkObs &m : mapObs){   
+      // calculate weight
+      //std::cout << m.x << " : " << lm_in_range[m.id].x << " , " << m.y << " : " << lm_in_range[m.id].y << std::endl << std::flush;
+      double weight = multiv_prob(std_landmark[0], std_landmark[1], m.x, m.y, lm_in_range[m.id].x, lm_in_range[m.id].y);
+      if( weight > 0 ){
+      	p.weight *= weight;
+      }
     }
-    
+    this->weights[p.id] = p.weight;
+    //std::cout << p.weight << " " << std::flush;
   }
 }
 

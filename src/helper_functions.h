@@ -9,6 +9,7 @@
 #ifndef HELPER_FUNCTIONS_H_
 #define HELPER_FUNCTIONS_H_
 
+#include <iostream>
 #include <math.h>
 #include <fstream>
 #include <sstream>
@@ -47,6 +48,31 @@ struct LandmarkObs {
   double x;   // Local (vehicle coords) x position of landmark observation [m]
   double y;   // Local (vehicle coords) y position of landmark observation [m]
 };
+/**
+ * Computes multivariate gaussian probibility. Copied from Implementation of a Particle Filter lesson 5
+ * @param (sig_x, sig_y) standard deviation of x and y values
+ * @param (x_obs, y_obs) x and y coordinates of observed landmark position
+ * @param (mu_x, mu_y) x and y coordinates of nearest landmark
+ 
+ * @output a weight corresponding to the accuracy of the particles
+ */
+inline double multiv_prob(double sig_x, double sig_y, double x_obs, double y_obs,
+                   double mu_x, double mu_y) {
+  // calculate normalization term
+  double gauss_norm;
+  gauss_norm = 1 / (2 * M_PI * sig_x * sig_y);
+  
+
+  // calculate exponent
+  double exponent;
+  exponent = (pow(x_obs - mu_x, 2) / (2 * pow(sig_x, 2)))
+               + (pow(y_obs - mu_y, 2) / (2 * pow(sig_y, 2)));
+    
+  // calculate weight using normalization terms and exponent
+  double weight;
+  weight = gauss_norm * exp(-exponent);  
+  return weight;
+}
 
 /**
  * Computes the Euclidean distance between two 2D points.
