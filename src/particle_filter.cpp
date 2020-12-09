@@ -19,7 +19,8 @@
 #include "helper_functions.h"
 
 void ParticleFilter::init(double x, double y, double theta, double std[]) {
-  this->num_particles = 200;	//Set number of particles
+  std::cout << "Initialized" << std::endl << std::flush;
+  this->num_particles = 20;	//Set number of particles
   
   std::normal_distribution<double> dist_x(x, std[0]);	//X distribution
   std::normal_distribution<double> dist_y(y, std[1]);	//Y distribution
@@ -44,6 +45,7 @@ void ParticleFilter::init(double x, double y, double theta, double std[]) {
 
 void ParticleFilter::prediction(double delta_t, double std_pos[], 
                                 double velocity, double yaw_rate) {
+  std::cout << "Prediction" << std::endl << std::flush;
 
   std::normal_distribution<double> dist_x(0, std_pos[0]);	//Random x gaussian noise
   std::normal_distribution<double> dist_y(0, std_pos[1]);	//Random y guassian noise
@@ -68,25 +70,35 @@ void ParticleFilter::prediction(double delta_t, double std_pos[],
 
 }
 
-void ParticleFilter::dataAssociation(std::vector<LandmarkObs> &predicted, 
-                                     const std::vector<LandmarkObs> observations) {
-  for(LandmarkObs &p : predicted){
+void ParticleFilter::dataAssociation(std::vector<LandmarkObs> predicted, 
+                                     std::vector<LandmarkObs> &observations, 
+                                     Particle &particle) {
+  std::vector<int> ass;
+  std::vector<double> sense_x;
+  std::vector<double> sense_y;
+  
+  for(unsigned int i = 0; i < observations.size(); i++){
     double distance = 0;
   	double prev_dist = std::numeric_limits<double>::infinity();
-    p.id = -1;
-    for(unsigned int i = 0; i < observations.size(); i++){
+    observations[i].id = -1;
+    for(LandmarkObs &p : predicted){
       distance = dist(p.x, p.y, observations[i].x, observations[i].y);
       if(distance < prev_dist){	//Loop until smallest distance, this is the closest
         prev_dist = distance;
-        p.id = i;	//Set ID to location in observations vector of corrosponding observation
+        observations[i].id = i;	//Set ID to location in observations vector of corrosponding observation
       }
     }
+    ass.push_back(observations[i].id);
+    sense_x.push_back(observations[i].x);
+    sense_y.push_back(observations[i].y);
   }
+  //SetAssociations(particle, ass, sense_x, sense_y);
 }
 
 void ParticleFilter::updateWeights(double sensor_range, double std_landmark[], 
                                    const std::vector<LandmarkObs> &observations, 
                                    const Map &map_landmarks) {
+  std::cout << "Update Weights" << std::endl << std::flush;
 
   for(Particle &p : this->particles){
     
@@ -114,37 +126,42 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
     }
     
     //Map observations to landmarks
-    dataAssociation(lm_in_range, mapObs);
-    std::cout << std:: endl << "Map OBS " << std::flush;
+    dataAssociation(lm_in_range, mapObs, p);
+    
+    /*std::cout << std:: endl << "Map OBS " << std::flush;
     for (int i = 0; i < mapObs.size(); i++){
       std::cout << i << " X: " << mapObs[i].x << " Y: " << mapObs[i].y << ' ' << std::flush;
     }
     
     std::cout << std:: endl << "Landmarks in range " << std::flush;
     for (auto &i : lm_in_range)
-      std::cout << " ID: " << i.id << " X: " << i.x << " Y: " << i.y << ' ' << std::flush;
+      std::cout << " ID: " << i.id << " X: " << i.x << " Y: " << i.y << ' ' << std::flush;*/
+    
     //Calculate weights with gaussian
     p.weight = 1.;
     this->weights[p.id] = 1.;
-    for(const LandmarkObs &lm : lm_in_range){
+    std::cout << "Map OBS size: " << mapObs.size() << std::endl << std::flush;
+    for(const LandmarkObs &m : mapObs){
       // calculate normalization term
       double gauss_norm;
       gauss_norm = 1 / (2 * M_PI * std_landmark[0] * std_landmark[1]);
 
       // calculate exponent
       double exponent;
-      exponent = (pow(mapObs[lm.id].x - lm.x, 2) / (2 * pow(std_landmark[0], 2)))
-               + (pow(mapObs[lm.id].y - lm.y, 2) / (2 * pow(std_landmark[1], 2)));
+      exponent = (pow(m.x - lm_in_range[m.id].x, 2) / (2 * pow(std_landmark[0], 2)))
+               + (pow(m.y - lm_in_range[m.id].y, 2) / (2 * pow(std_landmark[1], 2)));
 
       // calculate weight using normalization terms and exponent
       p.weight *= gauss_norm * exp(-exponent);
       this->weights[p.id] = p.weight;
+      std::cout << p.weight << " " << std::flush;
     }
     
   }
 }
 
 void ParticleFilter::resample() {
+  std::cout << "Resampled" << std::endl << std::flush;
   std::vector<Particle> new_particles(this->num_particles);	//New list of particles
   std::discrete_distribution<int> dist(weights.begin(), weights.end());	//Discrete distribution from weights
   for(Particle &p : new_particles){
