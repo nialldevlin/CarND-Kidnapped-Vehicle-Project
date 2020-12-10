@@ -105,18 +105,21 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
     
     //Convert each observation coordinates to map
     std::vector<LandmarkObs> mapObs;
+    mapObs.reserve(observations.size());
     LandmarkObs obs;
     for(const LandmarkObs &o : observations){
       // transform to map x coordinate
-      obs.x = p.x + (cos(p.theta) * o.x) - (sin(p.theta) * o.y);
+      obs.x = p.x + cos(p.theta) * o.x - sin(p.theta) * o.y;
 
       // transform to map y coordinate
-      obs.y = p.y + (sin(p.theta) * o.x) + (cos(p.theta) * o.y);
+      obs.y = p.y + sin(p.theta) * o.x + cos(p.theta) * o.y;
       mapObs.push_back(obs);
+      //std::cout << o.x << " : " << o.y << " , " << obs.x << " : " << obs.y << std::endl << std::flush;
     }
     
     //Find landmarks in sensor range
     std::vector<LandmarkObs> lm_in_range;
+    lm_in_range.reserve(observations.size());
     for(const Map::single_landmark_s &l : map_landmarks.landmark_list){
       if(dist(l.x_f, l.y_f, p.x, p.y) <= sensor_range){
         LandmarkObs lm;
@@ -127,35 +130,46 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
     }
     
     //Map observations to landmarks
-    dataAssociation(lm_in_range, mapObs, p);
+    //dataAssociation(lm_in_range, mapObs, p);
     
     //Calculate weights with gaussian
     p.weight = 1.;
     this->weights[p.id] = 1.;
-    std::cout << std::endl << "landmarks in range: " << lm_in_range.size() << std::endl << std::flush;
     for(const LandmarkObs &m : mapObs){   
       // calculate weight
-      std::cout << "Obs x: "m.x 
-        		<< ", Landmark x: "  << lm_in_range[m.id].x
-                << " , Obs Y: " << m.y 
-        		<< ", Landmark Y:  " << lm_in_range[m.id].y << std::endl << std::flush;
-      double weight = multiv_prob(std_landmark[0], std_landmark[1], m.x, m.y, lm_in_range[m.id].x, lm_in_range[m.id].y);
+      
+      double mu_x;
+      double mu_y;
+      double curr_dist = 0;
+      double prev_dist = std::numeric_limits<double>::infinity();
+      
+      for(LandmarkObs &lm : lm_in_range){
+        curr_dist = dist(lm.x, lm.y, m.x, m.y);
+        if(curr_dist < prev_dist){	//Loop until smallest distance, this is the closest
+          prev_dist = curr_dist;
+          mu_x = lm.x;
+          mu_y = lm.y;
+        }
+      }
+      
+      double weight = multiv_prob(std_landmark[0], std_landmark[1], m.x, m.y, mu_x, mu_y);
       if( weight > 0 ){
       	p.weight *= weight;
       }
     }
     this->weights[p.id] = p.weight;
-    std::cout << "Weight: " << p.weight << " " << std::flush;
   }
+  std::cout << std::endl;
 }
 
 void ParticleFilter::resample() {
   std::cout << "Resampled" << std::endl << std::flush;
-  std::vector<Particle> new_particles(this->num_particles);	//New list of particles
+  std::vector<Particle> new_particles;
+  new_particles.reserve(this->num_particles);	//New list of particles
   std::discrete_distribution<int> dist(weights.begin(), weights.end());	//Discrete distribution from weights
-  for(Particle &p : new_particles){
+  for(int i = 0; i < this->num_particles; i++){
     int id = dist(this->gen);
-    p = particles[id];	//select particles based on id picked from discrete distribution
+    new_particles.push_back(particles[id]);	//select particles based on id picked from discrete distribution
   }
   this->particles = new_particles;	//replace old particles
 }
