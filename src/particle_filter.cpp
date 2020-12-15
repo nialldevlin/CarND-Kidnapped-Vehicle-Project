@@ -13,22 +13,26 @@
 #include "helper_functions.h"
 
 void ParticleFilter::init(double x, double y, double theta, double std[]) {
+
 	num_particles = 500;
 
+	//Create gaussian distributions to add random noise
 	std::normal_distribution<double> distX(x, std[0]);
 	std::normal_distribution<double> distY(y, std[1]);
 	std::normal_distribution<double> distT(theta, std[2]);
 
+	//Reserve space
 	particles.reserve(num_particles);
 	weights.reserve(num_particles);
 
+	//Initialize each particle
 	for(int i = 0; i < num_particles; i++) {
 		Particle p;
-		p.id = i;
-		p.x = distX(gen);
-		p.y = distY(gen);
+		p.id = i;	//Keep track of particles
+		p.x = distX(gen);	//Add random noise
+		p.y = distY(gen);	
 		p.theta = distT(gen);
-		p.weight = 1.0;
+		p.weight = 1.0;	//Default weight is zero
 
 		weights.push_back(1.0);
 		particles.push_back(p);
@@ -39,25 +43,26 @@ void ParticleFilter::init(double x, double y, double theta, double std[]) {
 
 void ParticleFilter::prediction(double delta_t, double std_pos[], 
 								double velocity, double yaw_rate) {
+
+	//Create random noise
+	//This only needs to be done once
 	std::normal_distribution<double> distX(0, std_pos[0]);
 	std::normal_distribution<double> distY(0, std_pos[1]);
 	std::normal_distribution<double> distT(0, std_pos[2]);
 
 	for(Particle& p : particles) {
-		double x = p.x;
-		double y = p.y;
-		double theta = p.theta;
 
-		if(std::abs(yaw_rate) > 0.0001) {
-			p.x = x + (velocity / yaw_rate) * (sin(theta + yaw_rate * delta_t) - sin(theta));
-			p.y = y + (velocity / yaw_rate) * (cos(theta) - cos(theta + yaw_rate * delta_t));
-			p.theta = theta + yaw_rate * delta_t;
-		} else {
-			p.x = x + velocity * delta_t * cos(theta);
-			p.y = y + velocity * delta_t * sin(theta);
-			p.theta = theta;
+		if(std::abs(yaw_rate) > 0.0001) {	//If yaw rate not zero update location
+			p.x = p.x + (velocity / yaw_rate) * (sin(p.theta + yaw_rate * delta_t) - sin(p.theta));
+			p.y = p.y + (velocity / yaw_rate) * (cos(p.theta) - cos(p.theta + yaw_rate * delta_t));
+			p.theta = p.theta + yaw_rate * delta_t;
+		} else {	//If yaw rate is zero update location with different equations
+			p.x = p.x + velocity * delta_t * cos(p.theta);
+			p.y = p.y + velocity * delta_t * sin(p.theta);
+			p.theta = p.theta;
 		}
 
+		//Add random noise;
 		p.x += distX(gen);
 		p.y += distY(gen);
 		p.theta += distT(gen);
@@ -68,6 +73,8 @@ void ParticleFilter::dataAssociation(std::vector<LandmarkObs> predicted,
                                      std::vector<LandmarkObs>& observations) {
 	double curr_dist;
 	double prev_dist;
+
+	//Loop through both vectors
 	for (LandmarkObs& obs : observations) {
 
 		prev_dist = std::numeric_limits<double>::max();
@@ -76,7 +83,7 @@ void ParticleFilter::dataAssociation(std::vector<LandmarkObs> predicted,
 
 			curr_dist = dist(obs.x, obs.y, p.x, p.y);
 
-			if (prev_dist > curr_dist) {
+			if (prev_dist > curr_dist) {	//Find lowest distance and assign ID to match
 				obs.id = p.id;
 				prev_dist = curr_dist;
 			}
@@ -88,98 +95,97 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
                                    const std::vector<LandmarkObs> &observations, 
                                    const Map &map_landmarks) {
 
-  double gauss_norm = 1 / (2 * M_PI * std_landmark[0] * std_landmark[1]);
+  double gauss_norm = 1 / (2 * M_PI * std_landmark[0] * std_landmark[1]);	//Only need to calculate this once
   double weight;
   double exponent;
+  double sum = 0;	//Normalize all weights at the end
   
   for (Particle& p : particles) {
-      std::vector<LandmarkObs> map_obs;
+  	//Create vector of observations in map reference frame
+    std::vector<LandmarkObs> map_obs;
+    map_obs.reserve(observations.size());
       
-      for (LandmarkObs obs : observations) {
-          LandmarkObs o;
-          
-          o.x = p.x + (cos(p.theta) * obs.x) - (sin(p.theta) * obs.y);
-          o.y = p.y + (sin(p.theta) * obs.x) + (cos(p.theta) * obs.y);
-          o.id = obs.id;
+    for (LandmarkObs obs : observations) {
+      LandmarkObs o;
+      
+      //Convert coordinates to map frame
+      o.x = p.x + (cos(p.theta) * obs.x) - (sin(p.theta) * obs.y);
+      o.y = p.y + (sin(p.theta) * obs.x) + (cos(p.theta) * obs.y);
+      o.id = obs.id;
 
-          map_obs.push_back(o);
-        }
-        
-        std::vector<LandmarkObs> pred_landmarks;
-
-      for (unsigned int ld_index = 0; ld_index < map_landmarks.landmark_list.size(); ld_index++) 
-        {
-          int ld_id = map_landmarks.landmark_list[ld_index].id_i;
-          double ld_x = map_landmarks.landmark_list[ld_index].x_f;
-          double ld_y = map_landmarks.landmark_list[ld_index].y_f;
-
-          double landMarkDistFromParticle = dist(p.x, p.y, ld_x, ld_y);
-
-          if (landMarkDistFromParticle <= sensor_range) 
-          {
-            LandmarkObs l_is_within_range;
-            l_is_within_range.id = ld_id;
-            l_is_within_range.x = ld_x;
-            l_is_within_range.y = ld_y;
-            pred_landmarks.push_back(l_is_within_range);
-          }
-        }
+      map_obs.push_back(o);
+    }
     
-      dataAssociation(pred_landmarks, map_obs);
-      
-	  weight = 1.0;
-      p.weight = 1.0;
-      
-      double landmark_x, landmark_y;
-      double var_x = pow(std_landmark[0], 2);
-      double var_y = pow(std_landmark[1], 2);
+    //Create vector of landmarks in sensor range
+    std::vector<LandmarkObs> lm_in_range;
+    lm_in_range.reserve(observations.size());
+	double d;
+    
+    for (unsigned int i = 0; i < map_landmarks.landmark_list.size(); i++) {
 
-      for (unsigned int i = 0; i < map_obs.size(); i++) 
-      {
-        for (unsigned int ld_indx = 0; ld_indx < pred_landmarks.size(); ld_indx++) 
-        {
-          if (map_obs[i].id == pred_landmarks[ld_indx].id) 
-          {
-            landmark_x = pred_landmarks[ld_indx].x;
-            landmark_y = pred_landmarks[ld_indx].y;
-            exponent = (pow(map_obs[i].x - landmark_x, 2) / (2 * var_x)) + (pow(map_obs[i].y - landmark_y, 2) / (2 * var_y));
-            //std::cout << "probability " << probability << std::endl;
-            weight = weight * gauss_norm * exp(-exponent);
-            break;
-          }
+      d = dist(p.x, p.y, map_landmarks.landmark_list[i].x_f, map_landmarks.landmark_list[i].y_f);
+
+      //If distance to particle is withing sensor range it is a valid point
+      if (d <= sensor_range) {
+        LandmarkObs l;
+        l.id = map_landmarks.landmark_list[i].id_i;
+        l.x = map_landmarks.landmark_list[i].x_f;
+        l.y = map_landmarks.landmark_list[i].y_f;
+        lm_in_range.push_back(l);
+      }
+    }
+    
+    //Correlate observations and landmarks
+    dataAssociation(lm_in_range, map_obs);
+    
+    //Reset
+	weight = 1.0;
+    p.weight = 1.0;
+    
+    //Not the fastest way to do it
+    //Caluclates weight based on each observation-landmark pair
+    for (LandmarkObs& obs : map_obs) {
+      for (LandmarkObs& lm : lm_in_range) {
+        if (obs.id == lm.id) {
+          exponent = (pow(obs.x - lm.x, 2) / (2 * pow(std_landmark[0], 2))) + (pow(obs.y - lm.y, 2) / (2 * pow(std_landmark[1], 2)));
+          weight = weight * gauss_norm * exp(-exponent);
+          break;
         }
       }
-    std::cout << "weight: " << weight << std::endl;   
+    }
+
+    //Update weights
     p.weight = weight;
     weights[p.id] = weight;
+
+    //Update sum
+    sum += weight;
   }
-  double sumOfWeights = 0.0;
-  for (int p_i = 0; p_i < num_particles; p_i++) 
-  {
-    sumOfWeights += particles[p_i].weight;
-  }
-  std::cout << "normalizing constant " << sumOfWeights << std::endl;
-  if (sumOfWeights == 0) {
-  	exit(3);
-  }
-  for (int p_i = 0; p_i < num_particles; p_i++) 
-  {
-    particles[p_i].weight = particles[p_i].weight / sumOfWeights;
-    weights[p_i] = particles[p_i].weight;
+
+  //Normalize, guard against division by zero
+  if (sum != 0) {
+  	for (int i = 0; i < num_particles; i++) {
+      particles[i].weight /= sum;
+      weights[i] = particles[i].weight;
+    }
   }
 }
 
 void ParticleFilter::resample() {
+	//Create distribution to pick the weights
 	std::discrete_distribution<int> dist_w(weights.begin(), weights.end());
 
+	//Duplicate empty particle array
 	std::vector<Particle> new_particles;
 	new_particles.reserve(num_particles);
 
+	//Select new particles based on weight
 	for (int i = 0; i < num_particles; i++) {
 		int index = dist_w(gen);
 		new_particles.push_back(particles[index]);
 	}
 
+	//Assign particles to old vector
 	particles = new_particles;
 }
 
